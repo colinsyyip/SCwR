@@ -1,0 +1,12 @@
+---
+title: "test"
+
+header-includes: 
+ \usepackage{geometry}
+ \geometry{top=0.75in,left=0.80in,bottom=0.75in,right=0.80in}
+ 
+output:
+  pdf_document
+---
+
+Foobar foobar foobar foobar Foobar foobar foobar foobar Foobar foobar foobar foobar Foobar foobar foobar foobar Foobar foobar foobar foobar Foobar foobar foobar foobar Foobar foobar foobar foobar Foobar foobar foobar foobar Foobar foobar foobar foobar Foobar foobar foobar foobar

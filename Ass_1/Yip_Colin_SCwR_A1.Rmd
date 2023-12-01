@@ -1,0 +1,174 @@
+---
+title:
+  'Statistical Computing with R - Assignment 1'
+
+subtitle:
+  'Colin Yip, Student No: 3953629'
+
+header-includes: 
+  \usepackage{geometry}
+  \usepackage{amsmath}
+  \geometry{top=0.5in,left=0.5in,bottom=0.25in,right=0.5in}
+ 
+output:
+  pdf_document
+---
+# Exercise 1
+Formatting and output config.
+```{r global_set, echo=TRUE}
+library(knitr)
+library(formatR)
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(tidy.opts = list(width.cutoff = 80))
+```
+
+## Data Preparation
+### 1.
+``` {r ex1_1}
+curr_dir <- getwd()
+file_name <- "coca_cola.csv"
+catted_file_path <- paste(curr_dir, file_name, sep = "/")
+file_host <- "https://raw.githubusercontent.com"
+file_path <- "kalilurrahman/Coca-ColaStockdata/main"
+remote_file_name <- "Coca-Cola_stock_history.csv"
+file_url <- paste(file_host, file_path, remote_file_name, sep = "/")
+curl::curl_download(file_url, destfile = catted_file_path)
+```
+### 2. 
+```{r ex1_2}
+coca_cola_df <- read.csv(catted_file_path)
+original_column_names <- names(coca_cola_df)
+space_stripped_columns <- gsub(" ", "_", original_column_names, gsub)
+datetime_converted_dt <- as.Date(coca_cola_df$Date, format = "%Y-%m-%d")
+coca_cola_df$Date <- datetime_converted_dt
+start_date <- as.Date("01-01-2000", format = "%d-%m-%Y")
+end_date <- as.Date("31-12-2019", format = "%d-%m-%Y")
+bool_date_index <- (coca_cola_df$Date >= start_date) & (coca_cola_df$Date <= end_date)
+downselected_coca_cola_df <- subset(coca_cola_df, bool_date_index)
+```
+## Data Manipulation
+### 3.
+```{r ex1_3}
+volume_exceeds_bool <- downselected_coca_cola_df$Volume > 9e6
+downselected_coca_cola_df$HighVolume <- volume_exceeds_bool
+```
+\pagebreak
+### 4.
+```{r ex1_4, fig.align = 'center'}
+high_volume_days_df <- subset(downselected_coca_cola_df, volume_exceeds_bool)
+plot(high_volume_days_df$Dividends,
+  high_volume_days_df$High,
+  xlim = c(0, max(high_volume_days_df$Dividends) * 1.1),
+  ylim = c(0, max(high_volume_days_df$High) * 1.1),
+  xlab = "Dividends",
+  ylab = "Daily Highest Price",
+  main = "Dividends vs. Daily Highest Price for Days with Volume > 10e6"
+)
+```
+\leavevmode
+There are two groups of points - the first being days with no dividends but persisting a high volume of trades, and the second group with a $>0$ dividend value. The latter shows a strong positive correlation between dividends and daily highest price, which is most likely explained by the market reacting positively to high dividend yield days. Of course, not all days are dividend yield days and stock price is variable to more than just dividends, so the price fluctuates greatly and volume can still be high on days with no dividends. 
+
+\pagebreak
+
+### 5.
+```{r ex1_5}
+downselected_coca_cola_df$DateYear <- format(downselected_coca_cola_df$Date, "%Y")
+columns_classes <- sapply(downselected_coca_cola_df, class)
+numeric_columns <- names(columns_classes[columns_classes %in% c("integer", "numeric")])
+max_by_col <- function(r) apply(r, 2, max)
+summary_by <- by(
+  downselected_coca_cola_df[numeric_columns],
+  downselected_coca_cola_df$DateYear,
+  max_by_col
+)
+summary_df <- data.frame(do.call("rbind", summary_by))
+
+knitr::kable(summary_df, caption = "Highest value of each numeric column, by year")
+```
+
+\pagebreak
+
+### 6.
+```{r ex1_6, fig.align = 'center'}
+plot(summary_df$Dividends,
+  summary_df$High,
+  xlim = c(0, max(summary_df$Dividends) * 1.1),
+  ylim = c(0, max(summary_df$High) * 1.1),
+  xlab = "Annual Maximum Dividends",
+  ylab = "Annual Highest Price",
+  main = "Annual Maximum Dividends vs. Annual Highest Price, 2000-2019"
+)
+```
+Taking annual maximums instead of daily grain data, it is evident that there is a positive correlation between dividends and high prices - however because this does not respect day wise indexes (i.e. the maximum daily dividend of a given year is not necessarily aligned to the highest daily price of a given year), this is a very broad stroke association. Furthermore, this eliminates the large amount of variance visible in daily price even when there are no dividends. Without that information, it appears that the only dependent data point that share price depends on is dividends, which is false. 
+
+\pagebreak
+
+### 7.
+```{r ex1_7}
+return_df <- data.frame(row.names = c("Lowest Value", "Date of Lowest Value", "High-Low Diff."))
+for (i in 1:length(numeric_columns)) {
+  col_name <- numeric_columns[i]
+  col_min <- min(downselected_coca_cola_df[col_name])
+  col_max <- max(downselected_coca_cola_df[col_name])
+  indexes_of_min <- downselected_coca_cola_df[col_name] == col_min
+  date_of_min <- subset(downselected_coca_cola_df$Date, indexes_of_min)
+  min_date_of_min <- format(min(date_of_min), "%Y-%m-%d")
+  col_diff <- col_max - col_min
+  return_df[col_name] <- c(col_min, min_date_of_min, col_diff)
+}
+
+knitr::kable(return_df, caption = "Summary statistics of numeric columns")
+```
+
+\pagebreak
+
+## Exercise 2
+```{r ex2_1}
+beer_generator <- function(x_vec) {
+  generic_error_msg <- "beer_generator requires a vector of length 1 containing integer x, x > 0"
+  if (length(x_vec) != 1) {
+    stop(paste(generic_error_msg, ". Length(x_vec) > 1"))
+  }
+  x <- x_vec[1]
+  if (x %% 1 != 0) {
+    stop(paste(generic_error_msg, ". x_vec[1] is not integer"))
+  }
+  if (!(x > 0)) {
+    stop(paste(generic_error_msg, ". x_vec[1] <= 0"))
+  }
+
+  header_text <- sprintf("%s Bottles of Beers Song", x)
+  ge_1_first_clause_fmt <- "%s bottles of beer on the wall, %s bottles of beer."
+  e_1_first_clause_fmt <- "%s bottle of beer on the wall, %s bottle of beer."
+  plural_text_fmt <- "Take one down, pass it around, %s bottles of beer on the wall..."
+  singular_plus_one_text_fmt <- "Take one down, pass it around, %s bottle of beer on the wall..."
+  singular_text_fmt <- "Take one down, pass it around, no more bottles of beer on the wall."
+
+  out_string <- header_text
+
+  while (x > 0) {
+    if (x == 1) {
+      fmted_first_string <- sprintf(e_1_first_clause_fmt, x, x)
+      fmted_second_string <- singular_text_fmt
+    } else if (x == 2) {
+      fmted_first_string <- sprintf(ge_1_first_clause_fmt, x, x)
+      fmted_second_string <- sprintf(singular_plus_one_text_fmt, x - 1)
+    } else {
+      fmted_first_string <- sprintf(ge_1_first_clause_fmt, x, x)
+      fmted_second_string <- sprintf(plural_text_fmt, x - 1)
+    }
+    fmted_string <- paste(fmted_first_string, fmted_second_string)
+    out_string <- paste(out_string, "\n\n", fmted_string)
+    x <- x - 1
+  }
+
+  writeLines(strwrap(out_string, width = 100))
+}
+```
+
+\pagebreak
+
+```{r ex2_2}
+test_vec <- c(5)
+beer_generator(test_vec)
+```
