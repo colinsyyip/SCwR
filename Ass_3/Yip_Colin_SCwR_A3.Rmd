@@ -1,0 +1,275 @@
+---
+title:
+  'Statisical Computing with R - Assignment 3'
+
+subtitle:
+  'Colin Yip, Student No. 3953629'
+  
+header-includes:
+  \usepackage{geometry}
+  \usepackage{amsmath}
+  \geometry{top=0.5in, left=0.5in, right=0.5in, bottom=0.5in}
+  
+output:
+  pdf_document:
+    fig_crop: no
+---
+# Exercise 1
+Formatting and output config.
+```{r global_set, echo = TRUE}
+library(knitr)
+library(formatR)
+library(palmerpenguins)
+library(dplyr)
+library(ggplot2)
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(tidy.opts = list(width.cutoff = 80))
+```
+### Q1
+```{r}
+# Read in penguins
+penguins_data <- palmerpenguins::penguins
+# Print penguins to inspect
+print(penguins_data)
+# Convert penguins to a dataframe
+penguins_df <- as.data.frame(penguins_data)
+```
+`penguins` is a tibble.
+### Q2
+```{r}
+# Count penguins by species and island
+penguins_frequency_dist <- penguins_df %>%
+  group_by(species, island) %>%
+  count()
+# Convert to DF
+penguins_frequency_dist_df <- as.data.frame(penguins_frequency_dist)
+# Print results
+knitr::kable(penguins_frequency_dist_df,
+  caption = "Distribution Frequency of Penguins by Species and Island"
+)
+```
+There are `r length(unique(penguins_frequency_dist_df$species))` different species in this dataset.
+The following are the species found on each island.
+```{r}
+# Get unique penguin categories by island
+species_by_island_df <- penguins_df %>%
+  group_by(island) %>%
+  summarise(species = unique(species))
+# Print results
+knitr::kable(species_by_island_df,
+  caption = "Penguin Species by Island"
+)
+```
+### Q3
+```{r}
+# Filter for Gentoo penguins and get bill length values
+gentoo_idx <- which(penguins_df$species == "Gentoo")
+gentoo_bill_lengths <- penguins_df[gentoo_idx, ]$bill_length_mm
+
+# Filter for Chinstrap penguins and get bill length values
+chinstrap_idx <- which(penguins_df$species == "Chinstrap")
+chinstrap_bill_lengths <- penguins_df[chinstrap_idx, ]$bill_length_mm
+
+# Define significance value
+alpha <- 0.05
+
+# Do t test to evaluate if chinstrap average length
+# is greater than gentoo average length
+t_test_results <- t.test(
+  x = chinstrap_bill_lengths,
+  y = gentoo_bill_lengths,
+  alternative = "greater",
+  var.equal = F
+)
+t_test_pvalue <- t_test_results$p.value
+# Evaluate if p-value of t test is greater than signif. value
+if (t_test_pvalue < alpha) {
+  print("p-value of t-test is less than alpha, so we reject H0")
+} else {
+  print("p-value of t-test is greater than alpha, so we do not reject H0")
+}
+```
+Since a p-value of `r t_test_pvalue` is less than $\alpha=0.05$, we reject $H_0$ that $\mu_C \geq \mu_G$, and conclude that the expected value of bill lengths of Chinstrap penguins is greater than that of Gentoo penguins.
+
+# Exercise 2
+### Q1
+```{r}
+species_na_bool_idx <- is.na(penguins_df$species)
+body_mass_na_bool_idx <- is.na(penguins_df$body_mass_g)
+combined_bool_idx <- !species_na_bool_idx & !body_mass_na_bool_idx
+
+filtered_penguins_df <- penguins_df[combined_bool_idx, ]
+rows_removed_num <- nrow(penguins_df) - nrow(filtered_penguins_df)
+```
+There are `r rows_removed_num` rows removed due to missing `species` or `body_mass` values.
+
+### Q2
+```{r}
+species <- unique(filtered_penguins_df$species)
+species_color_list <- c("red", "blue", "green")
+combined_species_df <- data.frame()
+for (species_i in species) {
+  species_idx <- filtered_penguins_df$species == species_i
+  species_df <- filtered_penguins_df[species_idx, ]
+  species_df_slice <- species_df[c("species", "body_mass_g")]
+  combined_species_df <- rbind(combined_species_df, species_df_slice)
+}
+
+ggplot(combined_species_df, aes(body_mass_g, fill = species)) +
+  geom_density(alpha = 0.2) +
+  xlim(2000, 7000) +
+  ylim(0, 1.25e-3) +
+  ggtitle("Density of Body Mass (g) by Species")
+```
+It appears that Chinstrap and Adelie pengins have a similar average weight, which is lower than that of Gentoo penguins. Adelie and Gentoo penguins also have wider variance in weight than Chinstrap penguins.
+
+### Q3
+```{r}
+filtered_penguins_df$body_mass_kg <- filtered_penguins_df$body_mass_g / 1000
+neg.logl <- function(theta, pi1, pi2, pi3, w1, w2, w3, x) {
+  mu1 <- theta[1]
+  mu2 <- theta[2]
+  mu3 <- theta[3]
+
+  sigma_1 <- exp(theta[4])
+  sigma_2 <- exp(theta[5])
+  sigma_3 <- exp(theta[6])
+  # density of the mixture model:
+  f.x1 <- pi1 * dnorm(x, mu1, sd = sigma_1)
+  f.x2 <- pi2 * dnorm(x, mu2, sd = sigma_2)
+  f.x3 <- pi3 * dnorm(x, mu3, sd = sigma_3)
+  # negative log-likelihood:
+  -sum(w1 * log(f.x1) + w2 * log(f.x2) + w3 * log(f.x3))
+}
+```
+
+### Q4
+```{r}
+set.seed(3953629)
+
+em_algo <- function(x, pi1hat_init, pi2hat_init, pi3hat_init, n.iter) {
+  # Set n as length of provided x
+  n <- length(x)
+
+  # Set up pi_j for each j component
+  pi1hat <- rep(NA, n.iter)
+  pi2hat <- rep(NA, n.iter)
+  pi3hat <- rep(NA, n.iter)
+
+  # Set up p_hat_j for each j component
+  p1hat <- matrix(NA, n.iter, n)
+  p2hat <- matrix(NA, n.iter, n)
+  p3hat <- matrix(NA, n.iter, n)
+  
+  # Define starting range for pi_j
+  pi1hat_range <- pi1hat_init * 0.8
+  pi2hat_range <- pi2hat_init * 0.8
+  pi3hat_range <- pi3hat_init * 0.8
+
+  # Store initial provided pi values
+  pi1hat[1] <- pi1hat_init
+  pi2hat[1] <- pi2hat_init
+  pi3hat[1] <- pi3hat_init
+
+  # Calculate t=1 p_hats
+  p1hat[1, ] <- runif(n, pi1hat_init - pi1hat_range, pi1hat_init + pi1hat_range)
+  p2hat[1, ] <- runif(n, pi2hat_init - pi2hat_range, pi2hat_init + pi2hat_range)
+  p3hat[1, ] <- runif(n, pi3hat_init - pi3hat_range, pi3hat_init + pi3hat_range)
+
+  # Set up 6 column theta matrix, and t=1 theta guesses
+  thetahat <- matrix(NA, n.iter, 6)
+  theta_init_guesses <- c(
+    rep(mean(x), 3),
+    rep(sd(x), 3)
+  )
+
+  # Find initial log likelihood minimized values of theta
+  thetahat[1, ] <- optim(
+    theta_init_guesses,
+    function(theta) {
+      neg.logl(theta, pi1hat[1], pi2hat[1], pi3hat[1], 
+               p1hat[1, ], p2hat[1, ], p3hat[1, ], x)
+    }
+  )$par
+
+  # Iter through n.iter
+  for (t in 2:n.iter) {
+    # E step: update individual probability memberships
+    phat_numer.temp <- cbind(
+      pi1hat[t - 1] * dnorm(x, thetahat[t - 1, 1], exp(thetahat[t - 1, 4])),
+      pi2hat[t - 1] * dnorm(x, thetahat[t - 1, 2], exp(thetahat[t - 1, 5])),
+      pi3hat[t - 1] * dnorm(x, thetahat[t - 1, 3], exp(thetahat[t - 1, 6]))
+    )
+    # Reassign phat values to corresponding phat matrix
+    p1hat[t, ] <- phat_numer.temp[, 1]/rowSums(phat_numer.temp)
+    p2hat[t, ] <- phat_numer.temp[, 2]/rowSums(phat_numer.temp)
+    p3hat[t, ] <- phat_numer.temp[, 3]/rowSums(phat_numer.temp)
+    # M step: update parameter estimates
+    # Update for corresponding pi_hat
+    pi1hat[t] <- mean(p1hat[t, ])
+    pi2hat[t] <- mean(p2hat[t, ])
+    pi3hat[t] <- mean(p3hat[t, ])
+    # Update optimized theta values
+    thetahat[t, ] <- optim(thetahat[t-1, ], function(theta) {
+        neg.logl(theta, pi1hat[t], pi2hat[t], pi3hat[t], 
+                 p1hat[t, ], p2hat[t, ], p3hat[t, ], x)
+      }
+    )$par
+  }
+  # Return final theta values, pi values, and phat values
+  final_theta <- thetahat[n.iter, ]
+  final_pi <- c(pi1hat[n.iter], pi2hat[n.iter], pi3hat[n.iter])
+  return(list(theta = final_theta, 
+              pi = final_pi,
+              p1 = p1hat[n.iter, ],
+              p2 = p2hat[n.iter, ],
+              p3 = p3hat[n.iter, ]))
+}
+
+n <- nrow(filtered_penguins_df)
+peng_species_prop <- filtered_penguins_df %>%
+  group_by(species) %>%
+  count()
+peng_species_prop$prop <- peng_species_prop$n / n
+
+pi1hat_1 <- 1 / 3
+pi2hat_1 <- 1 / 3
+pi3hat_1 <- 1 / 3
+
+pi1hat_2 <- c(peng_species_prop$prop)[1]
+pi2hat_2 <- c(peng_species_prop$prop)[2]
+pi3hat_2 <- c(peng_species_prop$prop)[3]
+
+pi1hat_3 <- runif(1, 0, 0.45)
+pi2hat_3 <- runif(1, 0, 0.45)
+pi3hat_3 <- 1 - pi1hat_3 - pi2hat_3
+
+n.iter <- 500
+
+run_1 <- em_algo(filtered_penguins_df$body_mass_kg, 
+                 pi1hat_1, 
+                 pi2hat_1, 
+                 pi3hat_1, 
+                 n.iter)
+run_2 <- em_algo(filtered_penguins_df$body_mass_kg, 
+                 pi1hat_2,
+                 pi2hat_2,
+                 pi3hat_2,
+                 n.iter)
+run_3 <- em_algo(filtered_penguins_df$body_mass_kg, 
+                 pi1hat_3, 
+                 pi2hat_3, 
+                 pi3hat_3, 
+                 n.iter)
+```
+The starting points for `run_1` assume even probability across all three penguin distributions.
+
+The starting points for `run_2` follows the empirical frequency distribution in the data.
+
+THe starting points for `run_3` are randomized, ensuring all three $\pi$ still add to 1.
+
+### Q4
+```{r}
+run_1$p1 > 0.5
+  
+```
