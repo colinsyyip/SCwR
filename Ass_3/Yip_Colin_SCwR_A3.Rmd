@@ -25,6 +25,7 @@ library(ggplot2)
 knitr::opts_chunk$set(echo = TRUE)
 knitr::opts_chunk$set(tidy.opts = list(width.cutoff = 80))
 ```
+
 ### Q1
 ```{r}
 # Read in penguins
@@ -35,6 +36,7 @@ print(penguins_data)
 penguins_df <- as.data.frame(penguins_data)
 ```
 `penguins` is a tibble.
+
 ### Q2
 ```{r}
 # Count penguins by species and island
@@ -50,6 +52,7 @@ knitr::kable(penguins_frequency_dist_df,
 ```
 There are `r length(unique(penguins_frequency_dist_df$species))` different species in this dataset.
 The following are the species found on each island.
+
 ```{r}
 # Get unique penguin categories by island
 species_by_island_df <- penguins_df %>%
@@ -78,7 +81,7 @@ alpha <- 0.05
 t_test_results <- t.test(
   x = chinstrap_bill_lengths,
   y = gentoo_bill_lengths,
-  alternative = "greater",
+  alternative = "less",
   var.equal = F
 )
 t_test_pvalue <- t_test_results$p.value
@@ -89,7 +92,9 @@ if (t_test_pvalue < alpha) {
   print("p-value of t-test is greater than alpha, so we do not reject H0")
 }
 ```
-Since a p-value of `r t_test_pvalue` is less than $\alpha=0.05$, we reject $H_0$ that $\mu_C \geq \mu_G$, and conclude that the expected value of bill lengths of Chinstrap penguins is greater than that of Gentoo penguins.
+Since a p-value of `r t_test_pvalue` is greater than than $\alpha=0.05$, we cannot reject $H_0$ that $\mu_C \geq \mu_G$, and conclude that the expected value of bill lengths of Chinstrap penguins is greater than that of Gentoo penguins.
+
+\pagebreak
 
 # Exercise 2
 ### Q1
@@ -279,7 +284,7 @@ The starting points for `run_1` assume even probability across all three penguin
 
 The starting points for `run_2` follows the empirical frequency distribution in the data.
 
-THe starting points for `run_3` are randomized, ensuring all three $\pi$ still add to 1.
+THe starting points for `run_3` are randomized, ensuring all three $\pi_j$ still add to 1.
 
 ### Q5
 ```{r}
@@ -363,4 +368,68 @@ knitr::kable(mean_species_weights,
              col.names = c("Species", "Average Weight"),
              caption = "Average Weight (kg) by Species")
 ```
-The weights of the components are not similar, with the first group (Adelie), representing the majority of penguins. The estimates of average weight for Adelie are quite close to the actual, but the other two species (Chinstrap and Gentoo), differ from the calculated averages by larger values. 
+The weights of the components are not similar, with the first group (Adelie), representing the majority of penguins. 
+The estimates of average weight for Adelie are quite close to the actual, but the other two species (Chinstrap and Gentoo), differ from the calculated averages by larger values.
+
+### Q8
+```{r fig.width = 7, fig.height = 4}
+w1_prob <- run_1$p1[n.iter, ]
+w2_prob <- run_1$p2[n.iter, ]
+w3_prob <- run_1$p3[n.iter, ]
+
+# par()
+hist(w1_prob, 
+     breaks=20, 
+     col=rgb(1, 0, 0, 0.4),
+     main = "Probability Distribution of Penguins being in W_j")
+hist(w2_prob, 
+     breaks=20, 
+     col=rgb(0, 1, 0, 0.4),
+     add=T)
+hist(w3_prob, 
+     breaks=20, 
+     col=rgb(0, 0, 1, 0.4), 
+     add=T)
+legend("top",
+       c("W_1", "W_2", "W_3"),
+       ncol = 3,
+       fill = c(rgb(1, 0, 0, 0.4),
+                rgb(0, 1, 0, 0.4),
+                rgb(0, 0, 1, 0.4))
+       )
+
+```
+
+### Q9
+```{r}
+predictedComponent <- ifelse(run_1$p1[n.iter, ] > 0.5, 1, 0) + 
+  ifelse(run_1$p2[n.iter, ] > 0.5, 2, 0) +
+  ifelse(run_1$p3[n.iter, ] > 0.5, 3, 0)
+print(predictedComponent)
+```
+
+### Q10
+```{r}
+sex_pc_jfd <- table(filtered_penguins_df$sex, predictedComponent)
+knitr::kable(sex_pc_jfd,
+             caption = "Joint Frequency Distribution of Sex vs. Predicted W_j Component")
+
+species_pc_jfd <- table(filtered_penguins_df$species, predictedComponent)
+knitr::kable(species_pc_jfd,
+             caption = "Joint Frequency Distribution of Species vs. Predicted W_j Component")
+```
+
+### Q11
+```{r}
+actual_sex_species <- table(filtered_penguins_df$sex, filtered_penguins_df$species)
+knitr::kable(actual_sex_species,
+             caption = "Joing Frequency Distribution of Sex vs. Species")
+```
+If a penguin is in PC1, it is most likely a female, as there is a `r sex_pc_jfd[1, 1]/sum(sex_pc_jfd[, 1])` probability of female from PC1.
+If a penguin is in PC2, it is most likely a female, as there is a `r sex_pc_jfd[1, 2]/sum(sex_pc_jfd[, 2])` probability of female from PC2.
+If a penguin is in PC3, it will be male, as there is a `r sex_pc_jfd[2, 3]/sum(sex_pc_jfd[, 3])` probability of male from PC3 - in short there are no females in PC3.
+
+These guesses would be moderately accurate for PC1 and PC2, but far from reality from PC3 given the actual sex vs. species frequency distribution above.
+
+### Q12
+Based on the above JDF between PC and species, PC1 would align with Adelie, PC2 would align with Chinstrap, and PC3 would align with Gentoo 
