@@ -225,8 +225,6 @@ em_algo <- function(x, pi1hat_init, pi2hat_init, pi3hat_init, n.iter) {
     })$par
   }
   # Return final theta values, pi values, and phat values
-  # final_theta <- thetahat[n.iter, ]
-  # final_pi <- c(pi1hat[n.iter], pi2hat[n.iter], pi3hat[n.iter])
   return(list(
     theta = thetahat,
     pi1 = pi1hat,
@@ -238,26 +236,31 @@ em_algo <- function(x, pi1hat_init, pi2hat_init, pi3hat_init, n.iter) {
   ))
 }
 
+# Get proportions of penguins
 n <- nrow(filtered_penguins_df)
 peng_species_prop <- filtered_penguins_df %>%
   group_by(species) %>%
   count()
 peng_species_prop$prop <- peng_species_prop$n / n
 
+# Define even probabilities
 pi1hat_1 <- 1 / 3
 pi2hat_1 <- 1 / 3
 pi3hat_1 <- 1 / 3
 
+# Get proportions for pi
 pi1hat_2 <- c(peng_species_prop$prop)[1]
 pi2hat_2 <- c(peng_species_prop$prop)[2]
 pi3hat_2 <- c(peng_species_prop$prop)[3]
 
+# Randomize pi_j
 pi1hat_3 <- runif(1, 0, 0.45)
 pi2hat_3 <- runif(1, 0, 0.45)
 pi3hat_3 <- 1 - pi1hat_3 - pi2hat_3
 
 n.iter <- 500
 
+# Run em_algo n.iter times
 run_1 <- em_algo(
   filtered_penguins_df$body_mass_kg,
   pi1hat_1,
@@ -288,8 +291,10 @@ THe starting points for `run_3` are randomized, ensuring all three $\pi_j$ still
 
 ### Q5
 ```{r}
+# Get actual props of penguins
 actual_props <- c(peng_species_prop$prop)
 
+# Get predicted values for each run using p_hat[n.iter] > 0.5
 run_1_props <- list(
   Adelie = sum(run_1$p1[n.iter, ] > 0.5) / n,
   Gentoo = sum(run_1$p2[n.iter, ] > 0.5) / n,
@@ -306,6 +311,7 @@ run_3_props <- list(
   Chinstrap = sum(run_3$p3[n.iter, ] > 0.5) / n
 )
 
+# Build comps
 adelie_comp <- run_1_props$Adelie - c(
   run_1_props$Adelie,
   run_2_props$Adelie,
@@ -330,6 +336,7 @@ As such, Run 1 or Run 3 would be best given that they return the closest possibl
 
 ### Q6
 ```{r fig.width = 7, fig.height = 3}
+# For each pi, plot convergence to final pi value
 pi_labels <- c("pi1", "pi2", "pi3")
 for (pi_lab in pi_labels) {
   plot(run_1[[pi_lab]],
@@ -340,8 +347,9 @@ for (pi_lab in pi_labels) {
     ylim = c(0, 1),
     main = sprintf("Convergence of %s", pi_lab)
   )
-  abline(h = run_1[[pi_lab]][n.iter], 
-     col = 'red'
+  abline(
+    h = run_1[[pi_lab]][n.iter],
+    col = "red"
   )
 }
 ```
@@ -350,59 +358,73 @@ Given stable behaviour after about 200 iterations, the algorithm seems to have c
 
 ### Q7
 ```{r}
+# Get mu and sigma from theta_hat of last run
 pi_ests <- c(run_1$pi1[n.iter], run_1$pi2[n.iter], run_1$pi3[n.iter])
 mu_ests <- run_1$theta[n.iter, 1:3]
 sigma_ests <- run_1$theta[n.iter, 4:6]
 
+# Build DF for summary table
 mle_summary_df <- data.frame(rbind(pi_ests, mu_ests, sigma_ests),
-                             row.names = c("pi", "mu", "sigma"))
+  row.names = c("pi", "mu", "sigma")
+)
 
 knitr::kable(mle_summary_df,
-             col.names = c("j = 1", "j = 2", "j = 3"),
-             caption = "MLE of pi, mu, and sigma from Run 1")
+  col.names = c("j = 1", "j = 2", "j = 3"),
+  caption = "MLE of pi, mu, and sigma from Run 1"
+)
 
+# Get mean of each species from data
 mean_species_weights <- filtered_penguins_df %>%
-                          group_by(species) %>%
-                          summarise(weight = mean(body_mass_kg))
+  group_by(species) %>%
+  summarise(weight = mean(body_mass_kg))
 knitr::kable(mean_species_weights,
-             col.names = c("Species", "Average Weight"),
-             caption = "Average Weight (kg) by Species")
+  col.names = c("Species", "Average Weight"),
+  caption = "Average Weight (kg) by Species"
+)
 ```
 The weights of the components are not similar, with the first group (Adelie), representing the majority of penguins. 
 The estimates of average weight for Adelie are quite close to the actual, but the other two species (Chinstrap and Gentoo), differ from the calculated averages by larger values.
 
 ### Q8
-```{r fig.width = 7, fig.height = 4}
-w1_prob <- run_1$p1[n.iter, ]
-w2_prob <- run_1$p2[n.iter, ]
-w3_prob <- run_1$p3[n.iter, ]
+```{r fig.width = 5, fig.height = 3}
+# Sample distributions using params defined in theta
+w1_prob <- rnorm(n,
+                 mean = run_1$theta[n.iter, 1],
+                 sd = abs(run_1$theta[n.iter, 4]))
+w2_prob <- rnorm(n,
+                 mean = run_1$theta[n.iter, 2],
+                 sd = abs(run_1$theta[n.iter, 5]))
+w3_prob <- rnorm(n,
+                 mean = run_1$theta[n.iter, 3],
+                 sd = abs(run_1$theta[n.iter, 6]))
 
-# par()
-hist(w1_prob, 
-     breaks=20, 
-     col=rgb(1, 0, 0, 0.4),
-     main = "Probability Distribution of Penguins being in W_j")
-hist(w2_prob, 
-     breaks=20, 
-     col=rgb(0, 1, 0, 0.4),
-     add=T)
-hist(w3_prob, 
-     breaks=20, 
-     col=rgb(0, 0, 1, 0.4), 
-     add=T)
-legend("top",
-       c("W_1", "W_2", "W_3"),
-       ncol = 3,
-       fill = c(rgb(1, 0, 0, 0.4),
-                rgb(0, 1, 0, 0.4),
-                rgb(0, 0, 1, 0.4))
-       )
-
+# Plot histograms for samples
+hist(w1_prob,
+  breaks = 50,
+  col = rgb(1, 0, 0, 0.4),
+  ylim = c(0, 35),
+  main = "Probability Distribution of Penguins for W_1"
+)
+hist(w2_prob,
+  breaks = 50,
+  col = rgb(0, 1, 0, 0.4),
+  # ylim = c(0, 300),
+  ylim = c(0, 35),
+  main = "Probability Distribution of Penguins for W_2"
+)
+hist(w3_prob,
+  breaks = 50,
+  col = rgb(0, 0, 1, 0.4),
+  # ylim = c(0, 300),
+  ylim = c(0, 35),
+  main = "Probability Distribution of Penguins for W_3"
+)
 ```
 
 ### Q9
 ```{r}
-predictedComponent <- ifelse(run_1$p1[n.iter, ] > 0.5, 1, 0) + 
+# Encode values to specific component index
+predictedComponent <- ifelse(run_1$p1[n.iter, ] > 0.5, 1, 0) +
   ifelse(run_1$p2[n.iter, ] > 0.5, 2, 0) +
   ifelse(run_1$p3[n.iter, ] > 0.5, 3, 0)
 print(predictedComponent)
@@ -410,20 +432,26 @@ print(predictedComponent)
 
 ### Q10
 ```{r}
+# Pivot out sex against predicted component
 sex_pc_jfd <- table(filtered_penguins_df$sex, predictedComponent)
 knitr::kable(sex_pc_jfd,
-             caption = "Joint Frequency Distribution of Sex vs. Predicted W_j Component")
+  caption = "Joint Frequency Distribution of Sex vs. Predicted W_j Component"
+)
 
+# Pivot out species against predicted components
 species_pc_jfd <- table(filtered_penguins_df$species, predictedComponent)
 knitr::kable(species_pc_jfd,
-             caption = "Joint Frequency Distribution of Species vs. Predicted W_j Component")
+  caption = "Joint Frequency Distribution of Species vs. Predicted W_j Component"
+)
 ```
 
 ### Q11
 ```{r}
+# Get JDF of sex vs. species
 actual_sex_species <- table(filtered_penguins_df$sex, filtered_penguins_df$species)
 knitr::kable(actual_sex_species,
-             caption = "Joing Frequency Distribution of Sex vs. Species")
+  caption = "Joing Frequency Distribution of Sex vs. Species"
+)
 ```
 If a penguin is in PC1, it is most likely a female, as there is a `r sex_pc_jfd[1, 1]/sum(sex_pc_jfd[, 1])` probability of female from PC1.
 If a penguin is in PC2, it is most likely a female, as there is a `r sex_pc_jfd[1, 2]/sum(sex_pc_jfd[, 2])` probability of female from PC2.
