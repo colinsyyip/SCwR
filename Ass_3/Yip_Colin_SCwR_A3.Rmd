@@ -160,7 +160,7 @@ em_algo <- function(x, pi1hat_init, pi2hat_init, pi3hat_init, n.iter) {
   p1hat <- matrix(NA, n.iter, n)
   p2hat <- matrix(NA, n.iter, n)
   p3hat <- matrix(NA, n.iter, n)
-  
+
   # Define starting range for pi_j
   pi1hat_range <- pi1hat_init * 0.8
   pi2hat_range <- pi2hat_init * 0.8
@@ -187,8 +187,10 @@ em_algo <- function(x, pi1hat_init, pi2hat_init, pi3hat_init, n.iter) {
   thetahat[1, ] <- optim(
     theta_init_guesses,
     function(theta) {
-      neg.logl(theta, pi1hat[1], pi2hat[1], pi3hat[1], 
-               p1hat[1, ], p2hat[1, ], p3hat[1, ], x)
+      neg.logl(
+        theta, pi1hat[1], pi2hat[1], pi3hat[1],
+        p1hat[1, ], p2hat[1, ], p3hat[1, ], x
+      )
     }
   )$par
 
@@ -201,29 +203,34 @@ em_algo <- function(x, pi1hat_init, pi2hat_init, pi3hat_init, n.iter) {
       pi3hat[t - 1] * dnorm(x, thetahat[t - 1, 3], exp(thetahat[t - 1, 6]))
     )
     # Reassign phat values to corresponding phat matrix
-    p1hat[t, ] <- phat_numer.temp[, 1]/rowSums(phat_numer.temp)
-    p2hat[t, ] <- phat_numer.temp[, 2]/rowSums(phat_numer.temp)
-    p3hat[t, ] <- phat_numer.temp[, 3]/rowSums(phat_numer.temp)
+    p1hat[t, ] <- phat_numer.temp[, 1] / rowSums(phat_numer.temp)
+    p2hat[t, ] <- phat_numer.temp[, 2] / rowSums(phat_numer.temp)
+    p3hat[t, ] <- phat_numer.temp[, 3] / rowSums(phat_numer.temp)
     # M step: update parameter estimates
     # Update for corresponding pi_hat
     pi1hat[t] <- mean(p1hat[t, ])
     pi2hat[t] <- mean(p2hat[t, ])
     pi3hat[t] <- mean(p3hat[t, ])
     # Update optimized theta values
-    thetahat[t, ] <- optim(thetahat[t-1, ], function(theta) {
-        neg.logl(theta, pi1hat[t], pi2hat[t], pi3hat[t], 
-                 p1hat[t, ], p2hat[t, ], p3hat[t, ], x)
-      }
-    )$par
+    thetahat[t, ] <- optim(thetahat[t - 1, ], function(theta) {
+      neg.logl(
+        theta, pi1hat[t], pi2hat[t], pi3hat[t],
+        p1hat[t, ], p2hat[t, ], p3hat[t, ], x
+      )
+    })$par
   }
   # Return final theta values, pi values, and phat values
-  final_theta <- thetahat[n.iter, ]
-  final_pi <- c(pi1hat[n.iter], pi2hat[n.iter], pi3hat[n.iter])
-  return(list(theta = final_theta, 
-              pi = final_pi,
-              p1 = p1hat[n.iter, ],
-              p2 = p2hat[n.iter, ],
-              p3 = p3hat[n.iter, ]))
+  # final_theta <- thetahat[n.iter, ]
+  # final_pi <- c(pi1hat[n.iter], pi2hat[n.iter], pi3hat[n.iter])
+  return(list(
+    theta = thetahat,
+    pi1 = pi1hat,
+    pi2 = pi2hat,
+    pi3 = pi3hat,
+    p1 = p1hat,
+    p2 = p2hat,
+    p3 = p3hat
+  ))
 }
 
 n <- nrow(filtered_penguins_df)
@@ -246,21 +253,27 @@ pi3hat_3 <- 1 - pi1hat_3 - pi2hat_3
 
 n.iter <- 500
 
-run_1 <- em_algo(filtered_penguins_df$body_mass_kg, 
-                 pi1hat_1, 
-                 pi2hat_1, 
-                 pi3hat_1, 
-                 n.iter)
-run_2 <- em_algo(filtered_penguins_df$body_mass_kg, 
-                 pi1hat_2,
-                 pi2hat_2,
-                 pi3hat_2,
-                 n.iter)
-run_3 <- em_algo(filtered_penguins_df$body_mass_kg, 
-                 pi1hat_3, 
-                 pi2hat_3, 
-                 pi3hat_3, 
-                 n.iter)
+run_1 <- em_algo(
+  filtered_penguins_df$body_mass_kg,
+  pi1hat_1,
+  pi2hat_1,
+  pi3hat_1,
+  n.iter
+)
+run_2 <- em_algo(
+  filtered_penguins_df$body_mass_kg,
+  pi1hat_2,
+  pi2hat_2,
+  pi3hat_2,
+  n.iter
+)
+run_3 <- em_algo(
+  filtered_penguins_df$body_mass_kg,
+  pi1hat_3,
+  pi2hat_3,
+  pi3hat_3,
+  n.iter
+)
 ```
 The starting points for `run_1` assume even probability across all three penguin distributions.
 
@@ -268,8 +281,86 @@ The starting points for `run_2` follows the empirical frequency distribution in 
 
 THe starting points for `run_3` are randomized, ensuring all three $\pi$ still add to 1.
 
-### Q4
+### Q5
 ```{r}
-run_1$p1 > 0.5
-  
+actual_props <- c(peng_species_prop$prop)
+
+run_1_props <- list(
+  Adelie = sum(run_1$p1[n.iter, ] > 0.5) / n,
+  Gentoo = sum(run_1$p2[n.iter, ] > 0.5) / n,
+  Chinstrap = sum(run_1$p3[n.iter, ] > 0.5) / n
+)
+run_2_props <- list(
+  Chinstrap = sum(run_2$p1[n.iter, ] > 0.5) / n,
+  Adelie = sum(run_2$p2[n.iter, ] > 0.5) / n,
+  Gentoo = sum(run_2$p3[n.iter, ] > 0.5) / n
+)
+run_3_props <- list(
+  Adelie = sum(run_3$p1[n.iter, ] > 0.5) / n,
+  Gentoo = sum(run_3$p2[n.iter, ] > 0.5) / n,
+  Chinstrap = sum(run_3$p3[n.iter, ] > 0.5) / n
+)
+
+adelie_comp <- run_1_props$Adelie - c(
+  run_1_props$Adelie,
+  run_2_props$Adelie,
+  run_3_props$Adelie
+)
+chins_comp <- run_1_props$Chinstrap - c(
+  run_1_props$Chinstrap,
+  run_2_props$Chinstrap,
+  run_3_props$Chinstrap
+)
+gentoo_comp <- run_1_props$Gentoo - c(
+  run_1_props$Gentoo,
+  run_2_props$Gentoo,
+  run_3_props$Gentoo
+)
+
+knitr::kable(rbind(adelie_comp, chins_comp, gentoo_comp),
+  col.names = c("Run 1", "Run 2", "Run 3")
+)
 ```
+As such, Run 1 or Run 3 would be best given that they return the closest possible proportion relative to the intial observed values. Moving forward, Run 1 will be used.
+
+### Q6
+```{r fig.width = 7, fig.height = 3}
+pi_labels <- c("pi1", "pi2", "pi3")
+for (pi_lab in pi_labels) {
+  plot(run_1[[pi_lab]],
+    xlab = "iteration",
+    ylab = "pi",
+    pch = 4,
+    col = rgb(0, 0, 1, 0.3),
+    ylim = c(0, 1),
+    main = sprintf("Convergence of %s", pi_lab)
+  )
+  abline(h = run_1[[pi_lab]][n.iter], 
+     col = 'red'
+  )
+}
+```
+
+Given stable behaviour after about 200 iterations, the algorithm seems to have converged.
+
+### Q7
+```{r}
+pi_ests <- c(run_1$pi1[n.iter], run_1$pi2[n.iter], run_1$pi3[n.iter])
+mu_ests <- run_1$theta[n.iter, 1:3]
+sigma_ests <- run_1$theta[n.iter, 4:6]
+
+mle_summary_df <- data.frame(rbind(pi_ests, mu_ests, sigma_ests),
+                             row.names = c("pi", "mu", "sigma"))
+
+knitr::kable(mle_summary_df,
+             col.names = c("j = 1", "j = 2", "j = 3"),
+             caption = "MLE of pi, mu, and sigma from Run 1")
+
+mean_species_weights <- filtered_penguins_df %>%
+                          group_by(species) %>%
+                          summarise(weight = mean(body_mass_kg))
+knitr::kable(mean_species_weights,
+             col.names = c("Species", "Average Weight"),
+             caption = "Average Weight (kg) by Species")
+```
+The weights of the components are not similar, with the first group (Adelie), representing the majority of penguins. The estimates of average weight for Adelie are quite close to the actual, but the other two species (Chinstrap and Gentoo), differ from the calculated averages by larger values. 
