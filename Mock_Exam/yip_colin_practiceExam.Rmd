@@ -1,0 +1,396 @@
+---
+title: "Practice Exam"
+author: "Colin Yip, Student No. 3953629"
+date: "2023-12-14"
+
+header-includes:
+  \usepackage{geometry}
+  \usepackage{amsmath}
+  \geometry{top=0.25in, bottom=0.25in, left=0.25in, right=0.25in}
+
+output:
+  pdf_document:
+    fig_crop:
+      no
+---
+
+```{r global_set, echo = F}
+library(knitr)
+options(width = 80)
+knitr::opts_chunk$set(echo = T)
+knitr::opts_chunk$set(tidy_opts = list(width.cutoff = 80))
+```
+
+# Exercise 1
+## Q1
+```{r}
+car_df <- read.csv("cartype.csv")
+
+head(car_df)
+```
+The data is in a long format, as it is year over year per row.
+
+
+## Q2
+```{r}
+library(dplyr)
+target_countries <- c("France", "Germany", "Italy", "Spain", "United Kingdom")
+filtered_car_df <- dplyr::filter(car_df, Entity %in% target_countries)
+
+head(filtered_car_df)
+```
+
+## Q3
+```{r}
+filtered_car_df$total <- filtered_car_df$battery_electric_number +
+  filtered_car_df$petrol_number +
+  filtered_car_df$diesel_gas_number +
+  filtered_car_df$hybrid_number
+total_per_year <- filtered_car_df %>%
+  group_by(Year) %>%
+  summarize(all_numbers = sum(total))
+total_per_type_per_year <- filtered_car_df %>%
+  group_by(Year) %>%
+  summarize(
+    batt = sum(battery_electric_number),
+    petrol = sum(petrol_number),
+    diesel = sum(diesel_gas_number),
+    hybrid = sum(hybrid_number)
+  )
+batt_prop <- cbind(
+  total_per_year$Year,
+  total_per_type_per_year$batt / total_per_year$all_numbers
+)
+petrol_prop <- cbind(
+  total_per_year$Year,
+  total_per_type_per_year$petrol / total_per_year$all_numbers
+)
+diesel_prop <- cbind(
+  total_per_year$Year,
+  total_per_type_per_year$diesel / total_per_year$all_numbers
+)
+hybrid_prop <- cbind(
+  total_per_year$Year,
+  total_per_type_per_year$hybrid / total_per_year$all_numbers
+)
+```
+
+## Q4
+```{r}
+filtered_cars_2008 <- filter(filtered_car_df, Year == 2008)
+max_diesel_idx <- which.max(filtered_cars_2008$diesel_gas_number)
+max_diesel_2008 <- filtered_cars_2008[max_diesel_idx, "Entity"]
+
+filtered_cars_2018 <- filter(filtered_car_df, Year == 2018)
+max_diesel_idx <- which.max(filtered_cars_2018$diesel_gas_number)
+max_diesel_2018 <- filtered_cars_2018[max_diesel_idx, "Entity"]
+```
+Maximum diesel car country in 2008 was `r max_diesel_2008` and maximum diesel car country in 2018 was `r max_diesel_2018`.
+
+## Q5
+```{r}
+filtered_cars_2005 <- filter(filtered_car_df, Year == 2005, Entity == "Germany")
+engine_type_names <- c(
+  "battery_electric_number", "petrol_number",
+  "diesel_gas_number", "hybrid_number"
+)
+pie(as.numeric(filtered_cars_2005[, engine_type_names]),
+  col = c("blue", "red", "purple", "orange"),
+  main = "2005 Germany Cars by Engine Type",
+  labels = engine_type_names
+)
+
+filtered_cars_2018 <- filter(filtered_car_df, Year == 2018, Entity == "Germany")
+engine_type_names <- c(
+  "battery_electric_number", "petrol_number",
+  "diesel_gas_number", "hybrid_number"
+)
+pie(as.numeric(filtered_cars_2018[, engine_type_names]),
+  col = c("blue", "red", "purple", "orange"),
+  main = "2018 Germany Cars by Engine Type",
+  labels = engine_type_names
+)
+```
+The proportion of diesel and petrol cars has reduced, with the proportion of hybrid and electric cars increasing.
+
+### Q6
+```{r}
+# Group car numbers by country
+hybrid_car_by_country <- filtered_car_df %>%
+  group_by(Year, Entity) %>%
+  summarize(
+    hybrid_number = hybrid_number,
+    total_cars = sum(
+      battery_electric_number,
+      petrol_number,
+      diesel_gas_number,
+      hybrid_number
+    )
+  )
+# Get proportion by country, year
+hybrid_car_by_country$hybrid_prop <- hybrid_car_by_country$hybrid_number /
+  hybrid_car_by_country$total_cars
+
+library(ptmixed)
+make.spaghetti(Year, hybrid_prop,
+  group = Entity, id = Entity,
+  data = data.frame(hybrid_car_by_country)
+)
+```
+Spain and UK have fastest diffusion of hybrids.
+
+## Q7
+```{r}
+library(reshape2)
+france_data <- filter(filtered_car_df, Entity == "France")
+france_car_types <- france_data %>%
+  group_by(Entity, Year) %>%
+  summarise(
+    battery_electric_number = battery_electric_number,
+    petrol_number = petrol_number,
+    diesel_gas_number = diesel_gas_number,
+    hybrid_number = hybrid_number
+  )
+melted_france_car_types <- melt(france_car_types,
+  id.vars = c("Entity", "Year")
+)
+
+make.spaghetti(Year, value,
+  group = variable, id = variable,
+  data = melted_france_car_types
+)
+```
+
+# Exercise 2
+## Q1
+```{r}
+k <- 7
+lambda <- 2
+
+ex2_1_func <- function(x) {
+  return((k / lambda) * ((x / lambda)^(k - 1)) * (exp(-((x / lambda)^k))))
+}
+
+x_range <- seq(0, 10, 0.1)
+curve(ex2_1_func, from = 0, to = 10)
+```
+
+## Q2
+```{r}
+k <- 3
+lambda <- 4
+x_range <- c(0.01, 30)
+ex2_2_func <- function(x, k, lambda) {
+  return((k / lambda) * ((x / lambda)^(k - 1)) * (exp(-((x / lambda)^k))))
+}
+maximized_x <- optimize(ex2_2_func, x_range, k, lambda, maximum = T)$maximum
+```
+The mode is `r maximized_x`.
+
+## Q3
+```{r}
+k <- 2.3
+lambda <- 5.7
+x_range <- c(0.01, 30)
+ex2_2_func <- function(x, k, lambda) {
+  return((k / lambda) * ((x / lambda)^(k - 1)) * (exp(-((x / lambda)^k))))
+}
+maximized_x <- optimize(ex2_2_func, x_range, k, lambda, maximum = T)$maximum
+```
+The mode is `r maximized_x`.
+
+## Q5
+```{r}
+mle_mode <- function(k, lambda) {
+  return(lambda * ((k-1)/k) ^ (1/k))
+}
+
+mle_mode(3, 4)
+mle_mode(2.3, 5.7)
+
+```
+Yes - advantage is that it is much more straightforward to compute numerically as it is compolicated to solve analytically. But analyticially is more precise.
+
+# Exercise 3
+## Q1
+```{r}
+getSummaries <- function(x) {
+  n <- length(x)
+  mean_vec <- mean(x)
+  median_vec <- median(x)
+  variance_vec <- var(x)
+
+  values <- c(n, mean_vec, median_vec, variance_vec)
+
+  statistic_names <- c(
+    "Sample size",
+    "Mean",
+    "Median",
+    "Variance"
+  )
+
+  output_df <- data.frame(cbind(statistic_names, values))
+  names(output_df) <- c("Statistic", "Value")
+  knitr::kable(output_df)
+}
+
+some_vec <- 1:10
+
+getSummaries(some_vec)
+```
+
+## Q2
+```{r}
+getSummaries <- function(x, digits) {
+  n <- length(x)
+  mean_vec <- round(mean(x), digits)
+  median_vec <- round(median(x), digits)
+  variance_vec <- round(var(x), digits)
+
+  values <- c(n, mean_vec, median_vec, variance_vec)
+
+  statistic_names <- c(
+    "Sample size",
+    "Mean",
+    "Median",
+    "Variance"
+  )
+
+  output_df <- data.frame(cbind(statistic_names, values))
+  names(output_df) <- c("Statistic", "Value")
+  knitr::kable(output_df)
+}
+
+getSummaries(some_vec, 2)
+```
+
+## Q3
+```{r}
+getSummaries <- function(x, digits, ignoreNAs) {
+  n <- length(x)
+  if (NA %in% x & !ignoreNAs) {
+    warning("There's NAs in x. Returning only n.")
+    output_df <- cbind(c("Sample size"), c(n))
+  } else if (NA %in% x & ignoreNAs) {
+    mean_vec <- round(mean(x, na.rm = T), digits)
+    median_vec <- round(median(x, na.rm = T), digits)
+    variance_vec <- round(var(x, na.rm = T), digits)
+
+    values <- c(n, mean_vec, median_vec, variance_vec)
+
+    statistic_names <- c(
+      "Sample size",
+      "Mean",
+      "Median",
+      "Variance"
+    )
+
+    output_df <- data.frame(cbind(statistic_names, values))
+  } else {
+    mean_vec <- round(mean(x), digits)
+    median_vec <- round(median(x), digits)
+    variance_vec <- round(var(x), digits)
+
+    values <- c(n, mean_vec, median_vec, variance_vec)
+
+    statistic_names <- c(
+      "Sample size",
+      "Mean",
+      "Median",
+      "Variance"
+    )
+
+    output_df <- data.frame(cbind(statistic_names, values))
+  }
+  names(output_df) <- c("Statistic", "Value")
+  knitr::kable(output_df)
+}
+
+vec_with_na <- c(1:5, NA, 7:10)
+getSummaries(vec_with_na, 2, F)
+```
+
+## Q4
+```{r}
+getSummariesPerVec <- function(x, digits, ignoreNAs) {
+  n <- length(x)
+  if (NA %in% x & !ignoreNAs) {
+    warning("There's NAs in x. Returning only n.")
+    output_df <- cbind(c("Sample size"), c(n))
+  } else if (NA %in% x & ignoreNAs) {
+    mean_vec <- round(mean(x, na.rm = T), digits)
+    median_vec <- round(median(x, na.rm = T), digits)
+    variance_vec <- round(var(x, na.rm = T), digits)
+
+    values <- c(n, mean_vec, median_vec, variance_vec)
+
+    statistic_names <- c(
+      "Sample size",
+      "Mean",
+      "Median",
+      "Variance"
+    )
+
+    output_df <- data.frame(cbind(statistic_names, values))
+  } else {
+    mean_vec <- round(mean(x), digits)
+    median_vec <- round(median(x), digits)
+    variance_vec <- round(var(x), digits)
+
+    values <- c(n, mean_vec, median_vec, variance_vec)
+
+    statistic_names <- c(
+      "Sample size",
+      "Mean",
+      "Median",
+      "Variance"
+    )
+
+    output_df <- data.frame(cbind(statistic_names, values))
+  }
+  names(output_df) <- c("Statistic", "Value")
+  knitr::kable(output_df)
+}
+
+getSummaries <- function(x, digits, ignoreNAs) {
+  if (is.matrix(x)) {
+    x_ncol <- ncol(x)
+    x_ncol_range <- 1:x_ncol
+    apply(x, 2, getSummariesPerVec, digits, ignoreNAs)
+  } else if (is.vector(x)) {
+    getSummariesPerVec(x, digits, ignoreNAs)
+  }
+}
+
+some_matrix <- matrix(1:4, nrow = 2, ncol = 2)
+getSummaries(some_matrix, 2, T)
+```
+
+## Q5
+```{r}
+getSummaries <- function(x, digits, ignoreNAs) {
+  if (is.matrix(x)) {
+    x_ncol <- ncol(x)
+    x_ncol_range <- 1:x_ncol
+    apply(x, 2, getSummariesPerVec, digits, ignoreNAs)
+  } else if (is.vector(x) & is.numeric(x)) {
+    getSummariesPerVec(x, digits, ignoreNAs)
+  } else {
+    stop("Neither matrix nor vector passed.")
+  }
+}
+```
+
+## Q6
+```{r}
+set.seed(3078)
+x1 <- rhyper(300, 5, 20, 10)
+x2 <- c(rep(cars$speed, 3), rep(NA, 50), rep(cars$dist, 2))
+x3 <- cbind(x1, x2)
+
+sapply(list(x1, x2, x3), getSummaries, digits = 2, ignoreNAs = T)
+```
+
+## Q7
+```{r}
+sapply(list(x1, x2, x3), getSummaries, digits = 4, ignoreNAs = F)
